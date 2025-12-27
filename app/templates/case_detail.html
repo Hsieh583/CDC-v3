@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+
+{% block title %}案件詳情 - CDC-PR{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Loading -->
+    <div id="loading" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">載入中...</span>
+        </div>
+        <p class="mt-2">載入案件資料中...</p>
+    </div>
+    
+    <!-- Case Details -->
+    <div id="case-details" style="display: none;">
+        <!-- Case Header -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-folder2-open"></i> 
+                        <span id="case-number"></span>
+                    </h5>
+                    <div>
+                        <a href="/" class="btn btn-sm btn-secondary">
+                            <i class="bi bi-arrow-left"></i> 返回列表
+                        </a>
+                        <button class="btn btn-sm btn-info" id="download-template-btn">
+                            <i class="bi bi-download"></i> 下載請購單範本
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>案件名稱：</strong><span id="case-title"></span></p>
+                        <p><strong>當前狀態：</strong><span id="case-status-badge"></span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>建立日期：</strong><span id="case-created"></span></p>
+                        <p><strong>更新日期：</strong><span id="case-updated"></span></p>
+                    </div>
+                </div>
+                <div class="row" id="case-notes-row" style="display: none;">
+                    <div class="col-12">
+                        <p><strong>備註：</strong><span id="case-notes"></span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Documents Section -->
+            <div class="col-lg-8">
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="bi bi-file-earmark-text"></i> 文件管理
+                        </h6>
+                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                            <i class="bi bi-upload"></i> 上傳文件
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <!-- Main Document -->
+                        <div class="mb-4">
+                            <h6 class="border-bottom pb-2">主文件 (必填)</h6>
+                            <div id="main-document-section">
+                                <p class="text-muted">尚未上傳主文件</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Attachments -->
+                        <div>
+                            <h6 class="border-bottom pb-2">附件</h6>
+                            <div id="attachments-section">
+                                <p class="text-muted">尚未上傳附件</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status & History -->
+            <div class="col-lg-4">
+                <!-- Status Management -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-arrow-repeat"></i> 狀態管理
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="update-status-form">
+                            <div class="mb-3">
+                                <label for="new-status" class="form-label">變更狀態</label>
+                                <select class="form-select" id="new-status" required>
+                                    <option value="">選擇狀態...</option>
+                                    <option value="Draft">草稿</option>
+                                    <option value="Submitted">已提交</option>
+                                    <option value="Approved">已核准</option>
+                                    <option value="Rejected">已拒絕</option>
+                                    <option value="Closed">已結案</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="status-notes" class="form-label">變更說明</label>
+                                <textarea class="form-control" id="status-notes" rows="2" 
+                                          placeholder="選填"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                <i class="bi bi-check-circle"></i> 更新狀態
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Status History -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clock-history"></i> 狀態歷程
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="status-history-section">
+                            <p class="text-muted">載入中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-upload"></i> 上傳文件
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="upload-form">
+                    <div class="mb-3">
+                        <label for="doc-type" class="form-label">文件類型</label>
+                        <select class="form-select" id="doc-type" name="doc_type" required>
+                            <option value="main">主文件 (僅能上傳一個)</option>
+                            <option value="attachment" selected>附件</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="file-input" class="form-label">選擇檔案</label>
+                        <input type="file" class="form-control" id="file-input" name="file" required>
+                        <div class="form-text">支援任何格式的檔案，最大 100MB</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="doc-notes" class="form-label">備註</label>
+                        <textarea class="form-control" id="doc-notes" name="notes" rows="2" 
+                                  placeholder="選填"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="upload-submit-btn">
+                    <i class="bi bi-upload"></i> 上傳
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const caseId = {{ case_id | tojson }};
+let currentCase = null;
+
+$(document).ready(function() {
+    loadCaseDetails();
+    
+    $('#update-status-form').submit(function(e) {
+        e.preventDefault();
+        updateStatus();
+    });
+    
+    $('#upload-submit-btn').click(function() {
+        uploadDocument();
+    });
+    
+    $('#download-template-btn').click(function() {
+        window.location.href = '/api/cases/' + caseId + '/template';
+    });
+});
+
+function loadCaseDetails() {
+    $.get('/api/cases/' + caseId, function(response) {
+        $('#loading').hide();
+        
+        if (response.success) {
+            currentCase = response.case;
+            renderCaseDetails(currentCase);
+            renderDocuments(currentCase.documents);
+            renderStatusHistory(currentCase.status_history);
+            $('#case-details').show();
+        } else {
+            alert('載入案件失敗: ' + response.error);
+        }
+    }).fail(function() {
+        $('#loading').hide();
+        alert('載入案件失敗，請稍後再試');
+    });
+}
+
+function renderCaseDetails(caseData) {
+    $('#case-number').text(caseData.case_number);
+    $('#case-title').text(caseData.title || '未命名');
+    
+    const statusClass = 'status-' + caseData.current_status;
+    const statusText = getStatusText(caseData.current_status);
+    $('#case-status-badge').html(`<span class="badge ${statusClass} status-badge">${statusText}</span>`);
+    
+    $('#case-created').text(formatDateTime(caseData.created_at));
+    $('#case-updated').text(formatDateTime(caseData.updated_at));
+    
+    if (caseData.notes) {
+        $('#case-notes').text(caseData.notes);
+        $('#case-notes-row').show();
+    }
+    
+    // Set current status in select
+    $('#new-status').val(caseData.current_status);
+}
+
+function renderDocuments(documents) {
+    const mainDocs = documents.filter(d => d.doc_type === 'main');
+    const attachments = documents.filter(d => d.doc_type === 'attachment');
+    
+    // Render main document
+    if (mainDocs.length > 0) {
+        const doc = mainDocs[0];
+        $('#main-document-section').html(renderDocumentItem(doc));
+    } else {
+        $('#main-document-section').html('<p class="text-warning"><i class="bi bi-exclamation-triangle"></i> 尚未上傳主文件 (必填)</p>');
+    }
+    
+    // Render attachments
+    if (attachments.length > 0) {
+        const html = attachments.map(doc => renderDocumentItem(doc)).join('');
+        $('#attachments-section').html(html);
+    } else {
+        $('#attachments-section').html('<p class="text-muted">尚未上傳附件</p>');
+    }
+}
+
+function renderDocumentItem(doc) {
+    const icon = getFileIcon(doc.original_filename);
+    const size = doc.file_size ? formatFileSize(doc.file_size) : '';
+    const uploadedAt = formatDateTime(doc.uploaded_at);
+    
+    return `
+        <div class="border rounded p-3 mb-2">
+            <div class="d-flex align-items-center">
+                <i class="${icon} fs-3 me-3"></i>
+                <div class="flex-grow-1">
+                    <strong>${doc.original_filename}</strong><br>
+                    <small class="text-muted">上傳時間: ${uploadedAt} ${size ? '| 大小: ' + size : ''}</small>
+                    ${doc.notes ? '<br><small>備註: ' + doc.notes + '</small>' : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderStatusHistory(history) {
+    if (history.length === 0) {
+        $('#status-history-section').html('<p class="text-muted">尚無狀態變更記錄</p>');
+        return;
+    }
+    
+    const html = history.map(h => {
+        const changeText = h.old_status ? 
+            `${getStatusText(h.old_status)} → ${getStatusText(h.new_status)}` : 
+            getStatusText(h.new_status);
+        
+        return `
+            <div class="border-start border-3 border-primary ps-3 mb-3">
+                <small class="text-muted">${formatDateTime(h.changed_at)}</small><br>
+                <strong>${changeText}</strong>
+                ${h.notes ? '<br><small class="text-muted">' + h.notes + '</small>' : ''}
+            </div>
+        `;
+    }).join('');
+    
+    $('#status-history-section').html(html);
+}
+
+function updateStatus() {
+    const newStatus = $('#new-status').val();
+    const notes = $('#status-notes').val().trim();
+    
+    if (!newStatus) {
+        alert('請選擇狀態');
+        return;
+    }
+    
+    $.ajax({
+        url: '/api/cases/' + caseId + '/status',
+        type: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            status: newStatus,
+            notes: notes
+        }),
+        success: function(response) {
+            if (response.success) {
+                alert('狀態更新成功');
+                $('#status-notes').val('');
+                loadCaseDetails(); // Reload
+            } else {
+                alert('更新失敗: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            alert('更新失敗: ' + (xhr.responseJSON?.error || '未知錯誤'));
+        }
+    });
+}
+
+function uploadDocument() {
+    const fileInput = document.getElementById('file-input');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('請選擇檔案');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('doc_type', $('#doc-type').val());
+    formData.append('notes', $('#doc-notes').val().trim());
+    
+    const btn = $('#upload-submit-btn');
+    const originalText = btn.html();
+    btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> 上傳中...');
+    
+    $.ajax({
+        url: '/api/cases/' + caseId + '/documents',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                alert('文件上傳成功');
+                $('#upload-form')[0].reset();
+                bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+                loadCaseDetails(); // Reload
+            } else {
+                alert('上傳失敗: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            alert('上傳失敗: ' + (xhr.responseJSON?.error || '未知錯誤'));
+        },
+        complete: function() {
+            btn.prop('disabled', false).html(originalText);
+        }
+    });
+}
+
+function getStatusText(status) {
+    const map = {
+        'Draft': '草稿',
+        'Submitted': '已提交',
+        'Approved': '已核准',
+        'Rejected': '已拒絕',
+        'Closed': '已結案'
+    };
+    return map[status] || status;
+}
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const iconMap = {
+        'pdf': 'bi-file-pdf-fill text-danger',
+        'doc': 'bi-file-word-fill text-primary',
+        'docx': 'bi-file-word-fill text-primary',
+        'xls': 'bi-file-excel-fill text-success',
+        'xlsx': 'bi-file-excel-fill text-success',
+        'ppt': 'bi-file-ppt-fill text-warning',
+        'pptx': 'bi-file-ppt-fill text-warning',
+        'zip': 'bi-file-zip-fill text-secondary',
+        'rar': 'bi-file-zip-fill text-secondary',
+        'jpg': 'bi-file-image-fill text-info',
+        'jpeg': 'bi-file-image-fill text-info',
+        'png': 'bi-file-image-fill text-info',
+        'gif': 'bi-file-image-fill text-info'
+    };
+    return iconMap[ext] || 'bi-file-earmark-fill text-secondary';
+}
+</script>
+{% endblock %}
