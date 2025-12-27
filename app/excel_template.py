@@ -102,6 +102,7 @@ def create_procurement_template(case_number: str, title: str = "") -> BytesIO:
     # Save to BytesIO
     output = BytesIO()
     wb.save(output)
+    wb.close()
     output.seek(0)
     
     return output

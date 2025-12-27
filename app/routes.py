@@ -376,7 +376,13 @@ def download_blank_template():
     GET /api/template/blank
     """
     try:
+        print("Generating blank template...", flush=True)
         template = create_blank_template()
+        
+        # Ensure pointer is at start
+        template.seek(0)
+        size = template.getbuffer().nbytes
+        print(f"Template generated, size: {size} bytes", flush=True)
         
         return send_file(
             template,
