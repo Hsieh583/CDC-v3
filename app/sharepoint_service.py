@@ -3,6 +3,14 @@ from pathlib import Path
 from typing import Optional, Tuple
 from werkzeug.utils import secure_filename
 
+# Try to import SharePoint libraries (optional dependency)
+try:
+    from office365.runtime.auth.authentication_context import AuthenticationContext
+    from office365.sharepoint.client_context import ClientContext
+    SHAREPOINT_AVAILABLE = True
+except ImportError:
+    SHAREPOINT_AVAILABLE = False
+
 
 class SharePointService:
     """
@@ -55,10 +63,10 @@ class SharePointService:
     
     def _create_sharepoint_folder(self, case_number: str) -> Tuple[bool, str]:
         """Create folder in SharePoint"""
+        if not SHAREPOINT_AVAILABLE:
+            return self._create_local_folder(case_number)
+        
         try:
-            from office365.runtime.auth.authentication_context import AuthenticationContext
-            from office365.sharepoint.client_context import ClientContext
-            
             ctx_auth = AuthenticationContext(self.site_url)
             if ctx_auth.acquire_token_for_user(self.username, self.password):
                 ctx = ClientContext(self.site_url, ctx_auth)
@@ -90,10 +98,10 @@ class SharePointService:
     
     def _upload_to_sharepoint(self, case_number: str, file, filename: str) -> Tuple[bool, str, Optional[str]]:
         """Upload file to SharePoint"""
+        if not SHAREPOINT_AVAILABLE:
+            return self._upload_to_local(case_number, file, filename)
+        
         try:
-            from office365.runtime.auth.authentication_context import AuthenticationContext
-            from office365.sharepoint.client_context import ClientContext
-            
             ctx_auth = AuthenticationContext(self.site_url)
             if ctx_auth.acquire_token_for_user(self.username, self.password):
                 ctx = ClientContext(self.site_url, ctx_auth)

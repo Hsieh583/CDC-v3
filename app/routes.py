@@ -225,6 +225,18 @@ def upload_document(case_id):
         original_filename = file.filename
         safe_filename = secure_filename(original_filename)
         
+        # Validate safe_filename is not empty
+        if not safe_filename:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid filename. Please use ASCII characters.'
+            }), 400
+        
+        # Get actual file size
+        file.seek(0, 2)  # Seek to end
+        file_size = file.tell()
+        file.seek(0)  # Reset to beginning
+        
         success, file_path, error = sp_service.upload_file(
             case.case_number, 
             file, 
@@ -243,7 +255,7 @@ def upload_document(case_id):
             doc_type=doc_type,
             filename=safe_filename,
             original_filename=original_filename,
-            file_size=request.content_length,
+            file_size=file_size,
             mime_type=file.content_type,
             sharepoint_path=file_path if sp_service.sharepoint_enabled else None,
             local_path=file_path if not sp_service.sharepoint_enabled else None,

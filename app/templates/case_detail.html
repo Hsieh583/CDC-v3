@@ -181,7 +181,7 @@
 
 {% block extra_js %}
 <script>
-const caseId = {{ case_id }};
+const caseId = {{ case_id | tojson }};
 let currentCase = null;
 
 $(document).ready(function() {
