@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}案件清單 - CDC-PR{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card border-primary">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">總案件數</h6>
+                    <h2 class="card-title mb-0" id="stat-total">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-secondary">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">草稿</h6>
+                    <h2 class="card-title mb-0" id="stat-draft">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-info">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">已提交</h6>
+                    <h2 class="card-title mb-0" id="stat-submitted">0</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-success">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">已核准</h6>
+                    <h2 class="card-title mb-0" id="stat-approved">0</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Cases List -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-list-ul"></i> 案件清單
+            </h5>
+            <a href="/cases/new" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle"></i> 建立新案件
+            </a>
+        </div>
+        <div class="card-body">
+            <!-- Search and Filter -->
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" id="search-input" placeholder="搜尋案件編號或名稱...">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="status-filter">
+                        <option value="">所有狀態</option>
+                        <option value="Draft">草稿</option>
+                        <option value="Submitted">已提交</option>
+                        <option value="Approved">已核准</option>
+                        <option value="Rejected">已拒絕</option>
+                        <option value="Closed">已結案</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-secondary" id="search-btn">
+                        <i class="bi bi-search"></i> 搜尋
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div id="loading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">載入中...</span>
+                </div>
+                <p class="mt-2">載入中...</p>
+            </div>
+            
+            <!-- Cases Table -->
+            <div id="cases-table-container">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>案件編號</th>
+                            <th>案件名稱</th>
+                            <th>狀態</th>
+                            <th>文件數</th>
+                            <th>建立日期</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cases-tbody">
+                        <!-- Cases will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <nav id="pagination-container" class="mt-3">
+                <!-- Pagination will be loaded here -->
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPage = 1;
+let currentStatus = '';
+let currentSearch = '';
+
+$(document).ready(function() {
+    loadStats();
+    loadCases();
+    
+    $('#search-btn').click(function() {
+        currentSearch = $('#search-input').val();
+        currentStatus = $('#status-filter').val();
+        currentPage = 1;
+        loadCases();
+    });
+    
+    $('#search-input').keypress(function(e) {
+        if (e.which === 13) {
+            $('#search-btn').click();
+        }
+    });
+});
+
+function loadStats() {
+    $.get('/api/stats', function(response) {
+        if (response.success) {
+            $('#stat-total').text(response.stats.total_cases);
+            $('#stat-draft').text(response.stats.draft_cases);
+            $('#stat-submitted').text(response.stats.submitted_cases);
+            $('#stat-approved').text(response.stats.approved_cases);
+        }
+    });
+}
+
+function loadCases() {
+    $('#loading').show();
+    $('#cases-table-container').hide();
+    
+    const params = {
+        page: currentPage,
+        per_page: 20
+    };
+    
+    if (currentStatus) params.status = currentStatus;
+    if (currentSearch) params.search = currentSearch;
+    
+    $.get('/api/cases', params, function(response) {
+        $('#loading').hide();
+        $('#cases-table-container').show();
+        
+        if (response.success) {
+            renderCases(response.cases);
+            renderPagination(response.page, response.pages, response.total);
+        } else {
+            alert('載入案件失敗: ' + response.error);
+        }
+    }).fail(function() {
+        $('#loading').hide();
+        alert('載入案件失敗，請稍後再試');
+    });
+}
+
+function renderCases(cases) {
+    const tbody = $('#cases-tbody');
+    tbody.empty();
+    
+    if (cases.length === 0) {
+        tbody.append(`
+            <tr>
+                <td colspan="6" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mt-2">尚無案件資料</p>
+                </td>
+            </tr>
+        `);
+        return;
+    }
+    
+    cases.forEach(function(c) {
+        const row = $('<tr>').css('cursor', 'pointer');
+        row.click(function() {
+            window.location.href = '/cases/' + c.id;
+        });
+        
+        const statusClass = 'status-' + c.current_status;
+        const statusText = getStatusText(c.current_status);
+        const mainDocIcon = c.main_document_exists ? 
+            '<i class="bi bi-check-circle-fill text-success"></i>' : 
+            '<i class="bi bi-exclamation-circle-fill text-warning"></i>';
+        
+        row.append(`<td><strong>${c.case_number}</strong></td>`);
+        row.append(`<td>${c.title || '<em class="text-muted">未命名</em>'}</td>`);
+        row.append(`<td><span class="badge ${statusClass} status-badge">${statusText}</span></td>`);
+        row.append(`<td>${mainDocIcon} ${c.document_count}</td>`);
+        row.append(`<td>${formatDate(c.created_at)}</td>`);
+        row.append(`
+            <td>
+                <a href="/cases/${c.id}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation()">
+                    <i class="bi bi-eye"></i> 查看
+                </a>
+            </td>
+        `);
+        
+        tbody.append(row);
+    });
+}
+
+function renderPagination(currentPage, totalPages, total) {
+    const container = $('#pagination-container');
+    container.empty();
+    
+    if (totalPages <= 1) return;
+    
+    const ul = $('<ul class="pagination justify-content-center">');
+    
+    // Previous button
+    const prevLi = $('<li class="page-item">').addClass(currentPage === 1 ? 'disabled' : '');
+    prevLi.append(`<a class="page-link" href="#" data-page="${currentPage - 1}">上一頁</a>`);
+    ul.append(prevLi);
+    
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+            const li = $('<li class="page-item">').addClass(i === currentPage ? 'active' : '');
+            li.append(`<a class="page-link" href="#" data-page="${i}">${i}</a>`);
+            ul.append(li);
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+            ul.append('<li class="page-item disabled"><span class="page-link">...</span></li>');
+        }
+    }
+    
+    // Next button
+    const nextLi = $('<li class="page-item">').addClass(currentPage === totalPages ? 'disabled' : '');
+    nextLi.append(`<a class="page-link" href="#" data-page="${currentPage + 1}">下一頁</a>`);
+    ul.append(nextLi);
+    
+    container.append(ul);
+    
+    // Bind click events
+    ul.find('a').click(function(e) {
+        e.preventDefault();
+        const page = parseInt($(this).data('page'));
+        if (page > 0 && page <= totalPages) {
+            currentPage = page;
+            loadCases();
+        }
+    });
+}
+
+function getStatusText(status) {
+    const statusMap = {
+        'Draft': '草稿',
+        'Submitted': '已提交',
+        'Approved': '已核准',
+        'Rejected': '已拒絕',
+        'Closed': '已結案'
+    };
+    return statusMap[status] || status;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    });
+}
+</script>
+{% endblock %}

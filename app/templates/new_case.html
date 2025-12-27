@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}建立新案件 - CDC-PR{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-plus-circle"></i> 建立新案件
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="create-case-form">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">案件名稱 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="title" name="title" required 
+                                   placeholder="請輸入案件名稱">
+                            <div class="form-text">例如：辦公用品採購、設備維修案件等</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">備註說明</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="4" 
+                                      placeholder="請輸入案件相關備註說明（選填）"></textarea>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>說明：</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>案件編號將由系統自動產生（格式：CDC-PR-YYYY-NNNNN）</li>
+                                <li>案件建立後將自動建立 SharePoint 資料夾（或本地儲存）</li>
+                                <li>案件初始狀態為「草稿」，可在未定稿狀態下建立</li>
+                                <li>建立後請上傳主文件及相關附件</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> 取消
+                            </a>
+                            <button type="submit" class="btn btn-primary" id="submit-btn">
+                                <i class="bi bi-check-circle"></i> 建立案件
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-check-circle"></i> 建立成功
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p>案件建立成功！</p>
+                <p><strong>案件編號：</strong><span id="modal-case-number"></span></p>
+                <p class="mb-0">現在您可以上傳文件或稍後再上傳。</p>
+            </div>
+            <div class="modal-footer">
+                <a href="/" class="btn btn-secondary">返回首頁</a>
+                <button type="button" class="btn btn-primary" id="go-to-case-btn">前往案件</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let createdCaseId = null;
+
+$(document).ready(function() {
+    $('#create-case-form').submit(function(e) {
+        e.preventDefault();
+        createCase();
+    });
+    
+    $('#go-to-case-btn').click(function() {
+        if (createdCaseId) {
+            window.location.href = '/cases/' + createdCaseId;
+        }
+    });
+});
+
+function createCase() {
+    const submitBtn = $('#submit-btn');
+    const originalText = submitBtn.html();
+    
+    // Disable button and show loading
+    submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> 建立中...');
+    
+    const data = {
+        title: $('#title').val().trim(),
+        notes: $('#notes').val().trim()
+    };
+    
+    $.ajax({
+        url: '/api/cases',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                createdCaseId = response.case.id;
+                $('#modal-case-number').text(response.case.case_number);
+                
+                const modal = new bootstrap.Modal(document.getElementById('successModal'));
+                modal.show();
+                
+                // Reset form
+                $('#create-case-form')[0].reset();
+            } else {
+                alert('建立案件失敗: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = '建立案件失敗，請稍後再試';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMsg = xhr.responseJSON.error;
+            }
+            alert(errorMsg);
+        },
+        complete: function() {
+            submitBtn.prop('disabled', false).html(originalText);
+        }
+    });
+}
+</script>
+{% endblock %}
